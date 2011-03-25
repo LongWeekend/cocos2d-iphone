@@ -42,6 +42,7 @@
 	NSMutableDictionary *textures_;
 	NSLock				*dictLock_;
 	NSLock				*contextLock_;
+  NSInteger     activeThreads_;
 }
 
 /** Retruns ths shared instance of the cache */
@@ -107,6 +108,9 @@
  @since v0.99.4
  */
 -(void) removeTextureForKey: (NSString*) textureKeyName;
+
+@property (readonly) NSInteger activeThreads;
+@property BOOL shouldPurgeOnThreadCompletion;
 
 @end
 

@@ -73,6 +73,9 @@ static NSOpenGLContext *auxGLcontext = nil;
 
 @implementation CCTextureCache
 
+@synthesize activeThreads = activeThreads_;
+@synthesize shouldPurgeOnThreadCompletion;
+
 #pragma mark TextureCache - Alloc, Init & Dealloc
 static CCTextureCache *sharedTextureCache;
 
@@ -92,8 +95,15 @@ static CCTextureCache *sharedTextureCache;
 
 +(void)purgeSharedTextureCache
 {
-	[sharedTextureCache release];
-	sharedTextureCache = nil;
+  if ([sharedTextureCache activeThreads] == 0)
+  {
+    [sharedTextureCache release];
+    sharedTextureCache = nil;
+  }
+  else
+  {
+    [sharedTextureCache setShouldPurgeOnThreadCompletion:YES];
+  }
 }
 
 -(id) init
@@ -102,6 +112,8 @@ static CCTextureCache *sharedTextureCache;
 		textures_ = [[NSMutableDictionary dictionaryWithCapacity: 10] retain];
 		dictLock_ = [[NSLock alloc] init];
 		contextLock_ = [[NSLock alloc] init];
+    activeThreads_ = 0;
+    self.shouldPurgeOnThreadCompletion = NO;
 	}
 
 	return self;
@@ -243,6 +255,7 @@ static CCTextureCache *sharedTextureCache;
 
 	// MUTEX:
 	// Needed since addImageAsync calls this method from a different thread
+  activeThreads_++;
 	[dictLock_ lock];
 	
 	// remove possible -HD suffix to prevent caching the same image twice (issue #1040)
@@ -324,7 +337,7 @@ static CCTextureCache *sharedTextureCache;
 	}
 	
 	[dictLock_ unlock];
-	
+  activeThreads_--;
 	return tex;
 }
 
