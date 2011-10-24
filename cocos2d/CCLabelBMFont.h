@@ -70,8 +70,9 @@ typedef struct _BMFontPadding {
 } ccBMFontPadding;
 
 enum {
-	// how many characters are supported
-	kCCBMFontMaxChars = 2048, //256,
+  // how many characters are supported
+  // paul@longweeekendmobile.com UPDATED FOR JAPANESE SUPPORT
+  kCCBMFontMaxChars = 65536, //2048, //256,
 };
 
 /** CCBMFontConfiguration has parsed configuration of the the .fnt file
