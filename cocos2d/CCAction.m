@@ -2,6 +2,7 @@
  * cocos2d for iPhone: http://www.cocos2d-iphone.org
  *
  * Copyright (c) 2008-2010 Ricardo Quesada
+ * Copyright (c) 2011 Zynga Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -157,10 +158,11 @@
 {
 	[innerAction_ step: dt];
 	if( [innerAction_ isDone] ) {
-		ccTime diff = dt + innerAction_.duration - innerAction_.elapsed;
+		ccTime diff = innerAction_.elapsed - innerAction_.duration;
 		[innerAction_ startWithTarget:target_];
 		
-		// to prevent jerk. issue #390
+		// to prevent jerk. issue #390, 1247
+		[innerAction_ step: 0.0f];
 		[innerAction_ step: diff];
 	}
 }
@@ -321,8 +323,6 @@
 
 -(void) step:(ccTime) dt
 {
-#define CLAMP(x,y,z) MIN(MAX(x,y),z)
-	
 	if(boundarySet)
 	{
 		// whole map fits inside a single screen, no need to modify the position - unless map boundaries are increased
@@ -330,12 +330,10 @@
 			return;
 		
 		CGPoint tempPos = ccpSub( halfScreenSize, followedNode_.position);
-		[target_ setPosition:ccp(CLAMP(tempPos.x,leftBoundary,rightBoundary), CLAMP(tempPos.y,bottomBoundary,topBoundary))];
+		[target_ setPosition:ccp(clampf(tempPos.x,leftBoundary,rightBoundary), clampf(tempPos.y,bottomBoundary,topBoundary))];
 	}
 	else
-		[target_ setPosition:ccpSub( halfScreenSize, followedNode_.position )];
-	
-#undef CLAMP
+		[target_ setPosition:ccpSub( halfScreenSize, followedNode_.position )];	
 }
 
 

@@ -1,8 +1,10 @@
 /*
  * cocos2d for iPhone: http://www.cocos2d-iphone.org
  *
- * Copyright (c) 2008-2010 Ricardo Quesada
  * Copyright (c) 2009 Valentin Milea
+ *
+ * Copyright (c) 2008-2010 Ricardo Quesada
+ * Copyright (c) 2011 Zynga Inc.
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -105,6 +107,9 @@ enum {
 	// position of the node
 	CGPoint position_;
 	CGPoint	positionInPixels_;
+	
+	// skew angles
+	float skewX_, skewY_;
 
 	// is visible
 	BOOL visible_;
@@ -154,10 +159,14 @@ enum {
 
 	// Is running
 	BOOL isRunning_;
+	
+	//used to preserve sequence while sorting children with the same zOrder
+	NSUInteger orderOfArrival_;
 
 	// To reduce memory, place BOOLs that are not properties here:
 	BOOL isTransformDirty_:1;
 	BOOL isInverseDirty_:1;
+	BOOL isReorderChildDirty_:1;
 #if	CC_NODE_TRANSFORM_USING_AFFINE_MATRIX
 	BOOL isTransformGLDirty_:1;
 #endif
@@ -174,6 +183,20 @@ enum {
  @since v0.8
  */
 @property (nonatomic,readwrite) float vertexZ;
+
+/** The X skew angle of the node in degrees.
+ This angle describes the shear distortion in the X direction.
+ Thus, it is the angle between the Y axis and the left edge of the shape
+ The default skewX angle is 0. Positive values distort the node in a CW direction.
+ */
+@property(nonatomic,readwrite,assign) float skewX;
+
+/** The Y skew angle of the node in degrees.
+ This angle describes the shear distortion in the Y direction.
+ Thus, it is the angle between the X axis and the bottom edge of the shape
+ The default skewY angle is 0. Positive values distort the node in a CCW direction.
+ */
+@property(nonatomic,readwrite,assign) float skewY;
 /** The rotation (angle) of the node in degrees. 0 is the default rotation angle. Positive values rotate node CW. */
 @property(nonatomic,readwrite,assign) float rotation;
 /** The scale factor of the node. 1.0 is the default scale factor. It modifies the X and Y scale at the same time. */
@@ -235,6 +258,9 @@ enum {
 @property(nonatomic,readwrite,assign) NSInteger tag;
 /** A custom user data pointer */
 @property(nonatomic,readwrite,assign) void *userData;
+
+/** used internally for zOrder sorting, don't change this manually */
+@property(nonatomic,readwrite) NSUInteger orderOfArrival;
 
 // initializators
 /** allocates and initializes a node.
@@ -318,6 +344,10 @@ enum {
  * The child MUST be already added.
  */
 -(void) reorderChild:(CCNode*)child z:(NSInteger)zOrder;
+
+/** performance improvement, Sort the children array once before drawing, instead of every time when a child is added or reordered
+ don't call this manually unless a child added needs to be removed in the same frame */
+- (void) sortAllChildren;
 
 /** Stops all running actions and schedulers
  @since v0.8
@@ -438,6 +468,17 @@ enum {
  If the selector is already scheduled, then the interval parameter will be updated without scheduling it again.
  */
 -(void) schedule: (SEL) s interval:(ccTime)seconds;
+/**
+ repeat will execute the action repeat + 1 times, for a continues action use kCCRepeatForever
+ delay is the amount of time the action will wait before execution
+ */
+-(void) schedule:(SEL)selector interval:(ccTime)interval repeat: (uint) repeat delay:(ccTime) delay;
+
+/**
+ Schedules a selector that runs only once, with a delay of 0 or larger 
+*/
+- (void) scheduleOnce:(SEL) selector delay:(ccTime) delay;
+
 /** unschedules a custom selector.*/
 -(void) unschedule: (SEL) s;
 

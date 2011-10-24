@@ -2,6 +2,7 @@
  * cocos2d for iPhone: http://www.cocos2d-iphone.org
  *
  * Copyright (c) 2009-2010 Ricardo Quesada
+ * Copyright (c) 2011 Zynga Inc.
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -54,6 +55,11 @@ enum {
 	TMXPropertyObject,
 	TMXPropertyTile
 };
+
+// Bits on the far end of the 32-bit global tile ID (GID's) are used for tile flags
+#define kFlippedHorizontallyFlag	0x80000000
+#define kFlippedVerticallyFlag		0x40000000
+#define kFlippedMask				~(kFlippedHorizontallyFlag|kFlippedVerticallyFlag)
 
 /* CCTMXLayerInfo contains the information about the layers like:
  - Layer name

@@ -2,6 +2,7 @@
  * cocos2d for iPhone: http://www.cocos2d-iphone.org
  *
  * Copyright (c) 2009-2010 Ricardo Quesada
+ * Copyright (c) 2011 Zynga Inc.
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -35,22 +36,28 @@
 #import "CCTextureCache.h"
 #import "Support/CGPointExtension.h"
 
+
 #pragma mark -
 #pragma mark CCSpriteBatchNode Extension
 
+@interface CCSpriteBatchNode (TMXTiledMapExtensions)
+-(id) addSpriteWithoutQuad:(CCSprite*)child z:(NSUInteger)z tag:(NSInteger)aTag;
+-(void) addQuadFromSprite:(CCSprite*)sprite quadIndex:(NSUInteger)index;
+@end
+
 /* IMPORTANT XXX IMPORTNAT:
- * These 2 methods can't be part of CCTMXLayer since they call [super add...], and CCSpriteSheet#add SHALL not be called
+ * These 2 methods can't be part of CCTMXLayer since they call [super add...], and CCSpriteBatchNode#add SHALL not be called
  */
 @implementation CCSpriteBatchNode (TMXTiledMapExtension)
 
 /* Adds a quad into the texture atlas but it won't be added into the children array.
  This method should be called only when you are dealing with very big AtlasSrite and when most of the CCSprite won't be updated.
- For example: a tile map (CCTMXMap) or a label with lots of characgers (BitmapFontAtlas)
+ For example: a tile map (CCTMXMap) or a label with lots of characgers (CCLabelBMFont)
  */
 -(void) addQuadFromSprite:(CCSprite*)sprite quadIndex:(NSUInteger)index
 {
 	NSAssert( sprite != nil, @"Argument must be non-nil");
-	NSAssert( [sprite isKindOfClass:[CCSprite class]], @"CCSpriteSheet only supports CCSprites as children");
+	NSAssert( [sprite isKindOfClass:[CCSprite class]], @"CCSpriteBatchNode only supports CCSprites as children");
 	
 	
 	while(index >= textureAtlas_.capacity || textureAtlas_.capacity == textureAtlas_.totalQuads )
@@ -78,7 +85,7 @@
 -(id) addSpriteWithoutQuad:(CCSprite*)child z:(NSUInteger)z tag:(NSInteger)aTag
 {
 	NSAssert( child != nil, @"Argument must be non-nil");
-	NSAssert( [child isKindOfClass:[CCSprite class]], @"CCSpriteSheet only supports CCSprites as children");
+	NSAssert( [child isKindOfClass:[CCSprite class]], @"CCSpriteBatchNode only supports CCSprites as children");
 	
 	// quad index is Z
 	[child setAtlasIndex:z];
@@ -95,6 +102,9 @@
 	
 	// IMPORTANT: Call super, and not self. Avoid adding it to the texture atlas array
 	[super addChild:child z:z tag:aTag];
+	
+	//#issue 1262 don't use lazy sorting, tiles are added as quads not as sprites, so sprites need to be added in order
+	[self reorderBatch:NO];
 	return self;	
 }
 @end
@@ -103,7 +113,10 @@
 #pragma mark -
 #pragma mark CCTMXLayer
 
-@interface CCTMXLayer (Private)
+int compareInts (const void * a, const void * b);
+
+
+@interface CCTMXLayer ()
 -(CGPoint) positionForIsoAt:(CGPoint)pos;
 -(CGPoint) positionForOrthoAt:(CGPoint)pos;
 -(CGPoint) positionForHexAt:(CGPoint)pos;
@@ -119,12 +132,6 @@
 -(void) parseInternalProperties;
 
 -(NSInteger) vertexZForPos:(CGPoint)pos;
-
-// adding quad from sprite
--(void)addQuadFromSprite:(CCSprite*)sprite quadIndex:(NSUInteger)index;
-
-// adds an sprite without the quad
--(id)addSpriteWithoutQuad:(CCSprite*)child z:(NSInteger)z tag:(NSInteger)aTag;
 
 // index
 -(NSUInteger) atlasIndexForExistantZ:(NSUInteger)z;
@@ -329,10 +336,25 @@
 	NSAssert( tiles_ && atlasIndexArray_, @"TMXLayer: the tiles map has been released");
 	
 	NSInteger idx = pos.x + pos.y * layerSize_.width;
-	return tiles_[ idx ];
+	
+	// Bits on the far end of the 32-bit global tile ID are used for tile flags
+	return (tiles_[ idx ] & kFlippedMask);
 }
 
 #pragma mark CCTMXLayer - adding helper methods
+
+- (void) setupReusedTile:(CGPoint)pos withGID:(uint32_t)gid
+{
+	[reusedTile_ setPositionInPixels: [self positionAt:pos]];
+	[reusedTile_ setVertexZ: [self vertexZForPos:pos]];
+	reusedTile_.anchorPoint = CGPointZero;
+	[reusedTile_ setOpacity:opacity_];
+	
+	if (gid & kFlippedHorizontallyFlag)
+		reusedTile_.flipX = YES;
+	if (gid & kFlippedVerticallyFlag)
+		reusedTile_.flipY = YES;
+}
 
 -(CCSprite*) insertTileForGID:(uint32_t)gid at:(CGPoint)pos
 {
@@ -345,10 +367,7 @@
 	else
 		[reusedTile_ initWithBatchNode:self rectInPixels:rect];
 	
-	[reusedTile_ setPositionInPixels: [self positionAt:pos]];
-	[reusedTile_ setVertexZ: [self vertexZForPos:pos]];
-	reusedTile_.anchorPoint = CGPointZero;
-	[reusedTile_ setOpacity:opacity_];
+	[self setupReusedTile:pos withGID:gid];
 	
 	// get atlas index
 	NSUInteger indexForZ = [self atlasIndexForNewZ:z];
@@ -383,10 +402,7 @@
 	else
 		[reusedTile_ initWithBatchNode:self rectInPixels:rect];
 	
-	[reusedTile_ setPositionInPixels: [self positionAt:pos]];
-	[reusedTile_ setVertexZ: [self vertexZForPos:pos]];
-	reusedTile_.anchorPoint = CGPointZero;
-	[reusedTile_ setOpacity:opacity_];
+	[self setupReusedTile:pos withGID:gid];
 	
 	// get atlas index
 	NSUInteger indexForZ = [self atlasIndexForExistantZ:z];
@@ -413,10 +429,7 @@
 	else
 		[reusedTile_ initWithBatchNode:self rectInPixels:rect];
 	
-	[reusedTile_ setPositionInPixels: [self positionAt:pos]];
-	[reusedTile_ setVertexZ: [self vertexZForPos:pos]];
-	reusedTile_.anchorPoint = CGPointZero;
-	[reusedTile_ setOpacity:opacity_];
+	[self setupReusedTile:pos withGID:gid];
 	
 	// optimization:
 	// The difference between appendTileForGID and insertTileforGID is that append is faster, since
